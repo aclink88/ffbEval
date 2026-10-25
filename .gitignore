@@ -1,0 +1,25 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Exported Quarto/Markdown artifacts & personal notes (keep DIRECTORY.md tracked)
+DIRECTORY_files/
+DIRECTORY.html
+DIRECTORY.pdf
+Cot_Explained.md
+
+# Keep data/*.csv tracked for online Streamlit deployment
+!data/*.csv
