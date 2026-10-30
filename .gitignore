@@ -15,8 +15,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Exported Quarto/Markdown artifacts & personal notes (keep DIRECTORY.md tracked)
+# Exported Quarto/Markdown artifacts & personal notes
 DIRECTORY_files/
+DIRECTORY.md
 DIRECTORY.html
 DIRECTORY.pdf
 Cot_Explained.md

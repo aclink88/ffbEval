@@ -213,56 +213,153 @@ with tab2:
     )
 
 with tab3:
-    st.subheader("Individual Player Season Trajectory")
+    st.subheader("Player Season Trajectory & Multi-Player Comparison")
     
-    col_p1, col_p2 = st.columns([2, 1])
+    col_p1, col_p2, col_p3 = st.columns([2, 1, 2])
     with col_p1:
-        all_players = sorted(df['player_name'].dropna().unique())
-        selected_player = st.selectbox("Select Player to Inspect", all_players)
-    with col_p2:
         player_season = st.selectbox("Select Season to Inspect", seasons, index=seasons.index(selected_season))
+    with col_p2:
+        pos_filter_tab3 = st.selectbox("Filter Player Pool by Position", ["ALL", "WR", "RB", "TE", "QB"], index=0)
+        
+    season_pool_df = df[df['season'] == player_season]
+    if pos_filter_tab3 != "ALL":
+        season_pool_df = season_pool_df[season_pool_df['position'] == pos_filter_tab3]
+        
+    all_players = sorted(season_pool_df['player_name'].dropna().unique())
+    default_players = [all_players[0]] if len(all_players) > 0 else []
     
-    player_df = df[(df['player_name'] == selected_player) & (df['season'] == player_season)].sort_values(by='week')
+    with col_p1:
+        selected_players = st.multiselect(
+            "Select Player(s) to Compare",
+            options=all_players,
+            default=default_players
+        )
+    with col_p3:
+        selected_metrics = st.multiselect(
+            "Metrics to Display on Chart",
+            options=["Actual PPR Points", "Expected Fantasy Points (xFP)", "Model Prediction"],
+            default=["Actual PPR Points", "Expected Fantasy Points (xFP)", "Model Prediction"]
+        )
     
-    if len(player_df) == 0:
-        st.info(f"No records found for {selected_player} in the {player_season} season.")
+    if len(selected_players) == 0:
+        st.info("Please select at least one player above to display their trajectory.")
+    elif len(selected_metrics) == 0:
+        st.info("Please select at least one metric to display on the chart.")
     else:
         fig2 = go.Figure()
+        player_palette = [
+            "#1f77b4", "#d62728", "#2ca02c", "#9467bd",
+            "#ff7f0e", "#17becf", "#e377c2", "#bcbd22"
+        ]
+        is_multi = len(selected_players) > 1
+        comparison_rows = []
         
-        fig2.add_trace(go.Scatter(
-            x=player_df['week'],
-            y=player_df['fantasy_points_ppr'],
-            mode='lines+markers',
-            name='Actual PPR Points',
-            line=dict(color='royalblue', width=3),
-            marker=dict(size=8)
-        ))
+        for idx, p_name in enumerate(selected_players):
+            p_df = df[(df['player_name'] == p_name) & (df['season'] == player_season)].sort_values(by='week')
+            if len(p_df) == 0:
+                continue
+                
+            comparison_rows.append(p_df.iloc[-1])
+            base_color = player_palette[idx % len(player_palette)]
+            
+            last_played_week = int(p_df['week'].iloc[-1])
+            next_target_week = last_played_week + 1
+            
+            if 'projected_next_week_xfp' in p_df.columns:
+                upcoming_xfp = float(p_df['projected_next_week_xfp'].iloc[-1])
+            else:
+                next_xfp_boost = float(p_df['next_opp_dvp_xfp_adj'].iloc[-1]) if 'next_opp_dvp_xfp_adj' in p_df.columns else 0.0
+                upcoming_xfp = max(0.0, float(p_df['recent_expected_3wk'].iloc[-1]) + next_xfp_boost)
+                
+            # 1. Actual PPR Points (Completed Weeks)
+            if "Actual PPR Points" in selected_metrics:
+                fig2.add_trace(go.Scatter(
+                    x=p_df['week'],
+                    y=p_df['fantasy_points_ppr'],
+                    mode='lines+markers',
+                    name=f"{p_name} — Actual PPR" if is_multi else "Actual PPR Points",
+                    legendgroup=p_name,
+                    line=dict(color=base_color if is_multi else 'royalblue', width=3, dash='solid'),
+                    marker=dict(size=8, symbol='circle')
+                ))
+            
+            # 2. Expected Fantasy Points (xFP): Realized xFP + Projected Pre-Game xFP for Next Week (t+1)
+            if "Expected Fantasy Points (xFP)" in selected_metrics:
+                x_xfp = list(p_df['week']) + [next_target_week]
+                y_xfp = list(p_df['expected_fantasy_points_ppr']) + [upcoming_xfp]
+                
+                fig2.add_trace(go.Scatter(
+                    x=x_xfp,
+                    y=y_xfp,
+                    mode='lines+markers',
+                    name=f"{p_name} — Expected (xFP)" if is_multi else "Expected Fantasy Points (xFP)",
+                    legendgroup=p_name,
+                    line=dict(color=base_color if is_multi else 'firebrick', width=2, dash='dash'),
+                    marker=dict(size=8, symbol='diamond')
+                ))
+            
+            # 3. Model PPR Prediction: Pre-Week 1 Prior + Target-Week Aligned + Next Week (t+1)
+            if "Model Prediction" in selected_metrics:
+                x_pred = list(p_df['week'].iloc[1:]) + [next_target_week]
+                y_pred = list(p_df['predicted_next_week_ppr'])
+                if 'pre_week1_pred_ppr' in p_df.columns and pd.notna(p_df['pre_week1_pred_ppr'].iloc[0]):
+                    x_pred = [int(p_df['week'].iloc[0])] + x_pred
+                    y_pred = [float(p_df['pre_week1_pred_ppr'].iloc[0])] + y_pred
+                
+                fig2.add_trace(go.Scatter(
+                    x=x_pred,
+                    y=y_pred,
+                    mode='lines+markers',
+                    name=f"{p_name} — Model Pred" if is_multi else "Model Prediction (Target Week Aligned)",
+                    legendgroup=p_name,
+                    line=dict(color=base_color if is_multi else 'forestgreen', width=2, dash='dot'),
+                    marker=dict(size=8, symbol='square')
+                ))
         
-        fig2.add_trace(go.Scatter(
-            x=player_df['week'],
-            y=player_df['expected_fantasy_points_ppr'],
-            mode='lines+markers',
-            name='Expected Fantasy Points (xFP)',
-            line=dict(color='firebrick', dash='dash', width=2),
-            marker=dict(size=8)
-        ))
-        
-        fig2.add_trace(go.Scatter(
-            x=player_df['week'],
-            y=player_df['predicted_next_week_ppr'],
-            mode='lines+markers',
-            name='Model Prediction (Next Week)',
-            line=dict(color='forestgreen', dash='dot', width=2),
-            marker=dict(size=8)
-        ))
+        title_str = (
+            f"Multi-Player Comparison ({ ', '.join(selected_players) }) — {player_season}"
+            if is_multi else
+            f"{selected_players[0]} — Weekly Performance vs. Opportunity ({player_season})"
+        )
         
         fig2.update_layout(
-            title=f"{selected_player} — Weekly Performance vs. Opportunity ({player_season})",
+            title=title_str,
             xaxis_title="Week Number",
             yaxis_title="PPR Fantasy Points",
-            height=450,
-            hovermode="x unified"
+            height=500,
+            hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
         st.plotly_chart(fig2, use_container_width=True)
-        st.write(f"**Personal Efficiency Baseline Ratio**: `{player_df['personal_efficiency_baseline'].iloc[0]:.2f}`")
+        
+        if len(comparison_rows) > 0:
+            st.markdown("#### 📋 Selected Player(s) Head-to-Head Summary (Latest Week in Season)")
+            comp_df = pd.DataFrame(comparison_rows)
+            if 'projected_next_week_xfp' not in comp_df.columns:
+                comp_df['projected_next_week_xfp'] = comp_df['recent_expected_3wk']
+            if 'injury_status' not in comp_df.columns:
+                comp_df['injury_status'] = 'Healthy'
+                
+            summary_cols = [
+                'player_name', 'position', 'recent_team', 'week',
+                'effective_next_opponent', 'next_opp_dvp_total_adj',
+                'valuation_signal', 'predicted_next_week_ppr', 'projected_next_week_xfp',
+                'recent_actual_3wk', 'recent_expected_3wk',
+                'personal_efficiency_baseline', 'undervalued_index'
+            ]
+            valid_summary_cols = [c for c in summary_cols if c in comp_df.columns]
+            comp_display = comp_df[valid_summary_cols].sort_values(by='undervalued_index', ascending=False)
+            
+            st.dataframe(
+                comp_display.style.format({
+                    'next_opp_dvp_total_adj': '{:+.2f}',
+                    'predicted_next_week_ppr': '{:.1f}',
+                    'projected_next_week_xfp': '{:.1f}',
+                    'recent_actual_3wk': '{:.1f}',
+                    'recent_expected_3wk': '{:.1f}',
+                    'personal_efficiency_baseline': '{:.2f}',
+                    'undervalued_index': '{:.1f}'
+                }),
+                use_container_width=True
+            )

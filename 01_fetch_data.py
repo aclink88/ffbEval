@@ -36,6 +36,19 @@ def fetch_injury_data(years: list[int]) -> pl.DataFrame:
     inj_df = nfl.load_injuries(years)
     return inj_df
 
+def fetch_player_draft_metadata() -> pl.DataFrame:
+    """Fetch player draft capital and rookie season metadata via nflreadpy.load_players()."""
+    print("Fetching player draft capital metadata via nflreadpy...")
+    players_df = nfl.load_players()
+    draft_meta = players_df.select([
+        pl.col("gsis_id").alias("player_id"),
+        pl.col("rookie_season").cast(pl.Int64),
+        pl.col("draft_year").cast(pl.Int64),
+        pl.col("draft_round").cast(pl.Int64),
+        pl.col("draft_pick").cast(pl.Float64)
+    ]).unique(subset=["player_id"])
+    return draft_meta
+
 def fetch_next_week_schedule_map(years: list[int]) -> pl.DataFrame:
     """
     Fetches NFL schedule for given seasons and creates a lookup mapping:
@@ -119,6 +132,13 @@ def main():
             pl.lit("Healthy").alias("injury_status"),
             pl.lit(None).alias("primary_injury")
         ])
+
+    # 4. Fetch and merge player draft capital & rookie season metadata
+    try:
+        draft_meta = fetch_player_draft_metadata()
+        weekly_df = weekly_df.join(draft_meta, on="player_id", how="left")
+    except Exception as e:
+        print(f"Warning: Draft metadata merge skipped due to: {e}")
 
     weekly_path = os.path.join(DATA_DIR, "weekly_data_raw.csv")
     weekly_df.write_csv(weekly_path)
