@@ -110,22 +110,25 @@ def main():
         print(f"Warning: Next opponent schedule merge skipped due to: {e}")
         weekly_df = weekly_df.with_columns(pl.lit("BYE").alias("next_opponent_team"))
         
-    # 3. Fetch injury reports and join on player & week
+    # 3. Fetch injury reports and join on unique GSIS player_id & week
     try:
         inj_df = fetch_injury_data(seasons)
-        if "full_name" in inj_df.columns and "player_name" not in inj_df.columns:
-            inj_df = inj_df.with_columns(pl.col("full_name").alias("player_name"))
+        if "gsis_id" in inj_df.columns and "player_id" not in inj_df.columns:
+            inj_df = inj_df.with_columns(pl.col("gsis_id").alias("player_id"))
             
         inj_clean = inj_df.select([
-            pl.col("player_name"),
+            pl.col("player_id"),
             pl.col("season").cast(pl.Int64),
             pl.col("week").cast(pl.Int64),
             pl.col("report_status").alias("injury_status"),
             pl.col("report_primary_injury").alias("primary_injury")
-        ]).unique(subset=["player_name", "season", "week"])
+        ]).filter(pl.col("player_id").is_not_null()).unique(subset=["player_id", "season", "week"])
         
-        # Left join injury info onto weekly stats
-        weekly_df = weekly_df.join(inj_clean, on=["player_name", "season", "week"], how="left")
+        # Left join injury info onto weekly stats by unique player_id
+        weekly_df = weekly_df.join(inj_clean, on=["player_id", "season", "week"], how="left")
+        weekly_df = weekly_df.with_columns(
+            pl.col("injury_status").fill_null("Healthy")
+        )
     except Exception as e:
         print(f"Warning: Injury data merge skipped due to: {e}")
         weekly_df = weekly_df.with_columns([

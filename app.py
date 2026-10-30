@@ -5,7 +5,6 @@ Run via: .\.venv\Scripts\streamlit.exe run app.py
 
 import sys
 import os
-import subprocess
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -19,9 +18,13 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 def load_data():
     signals_path = os.path.join(DATA_DIR, "player_valuation_signals.csv")
     if not os.path.exists(signals_path):
-        st.error("Valuation data file not found! Click 'Refresh Data' in the sidebar or run 04_generate_buy_sell_signals.py.")
+        st.error("Valuation data file not found! Please run 04_generate_buy_sell_signals.py.")
         st.stop()
-    df = pd.read_csv(signals_path)
+    df = pd.read_csv(signals_path, low_memory=False)
+    if 'player_display_name' not in df.columns:
+        df['player_display_name'] = df['player_name']
+    else:
+        df['player_display_name'] = df['player_display_name'].fillna(df['player_name'])
     return df
 
 st.set_page_config(
@@ -30,26 +33,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sidebar Data Refresh Button
-st.sidebar.title("⚡ Pipeline Controls")
-if st.sidebar.button("🔄 Fetch & Update Latest NFL Data"):
-    with st.spinner("Fetching latest NFL stats, injury reports, and retraining models..."):
-        try:
-            python_exe = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe")
-            if not os.path.exists(python_exe):
-                python_exe = "python"
-                
-            subprocess.run([python_exe, "01_fetch_data.py"], check=True)
-            subprocess.run([python_exe, "02_feature_engineering.py"], check=True)
-            subprocess.run([python_exe, "04_generate_buy_sell_signals.py"], check=True)
-            
-            st.cache_data.clear()
-            st.sidebar.success("Pipeline executed successfully! Data refreshed.")
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"Data refresh failed: {e}")
-
-st.sidebar.divider()
 st.sidebar.title("🏈 Valuation Filters")
 
 df = load_data()
@@ -120,7 +103,7 @@ with tab1:
             y="recent_actual_3wk",
             color="valuation_signal",
             symbol="position",
-            hover_name="player_name",
+            hover_name="player_display_name",
             hover_data={
                 "position": True,
                 "recent_team": True,
@@ -185,7 +168,7 @@ with tab2:
     table_df = filtered_df[filtered_df['position'].isin(pos_tab2)].copy()
     
     display_cols = [
-        'player_name', 'position', 'recent_team', 'effective_next_opponent',
+        'player_display_name', 'position', 'recent_team', 'effective_next_opponent',
         'next_opp_dvp_total_adj', 'valuation_signal',
         'injury_status', 'predicted_next_week_ppr', 'next_week_lineup_projection',
         'recent_actual_3wk', 'recent_expected_3wk',
@@ -225,13 +208,24 @@ with tab3:
     if pos_filter_tab3 != "ALL":
         season_pool_df = season_pool_df[season_pool_df['position'] == pos_filter_tab3]
         
-    all_players = sorted(season_pool_df['player_name'].dropna().unique())
-    default_players = [all_players[0]] if len(all_players) > 0 else []
+    # Build unique player options keyed by unique GSIS player_id to prevent any name collisions
+    latest_player_meta = (
+        season_pool_df.sort_values('week')
+        .groupby('player_id', as_index=False)
+        .last()[['player_id', 'player_display_name', 'position', 'recent_team']]
+        .sort_values('player_display_name')
+    )
+    player_label_to_id = {
+        f"{row['player_display_name']} ({row['position']} - {row['recent_team']})": row['player_id']
+        for _, row in latest_player_meta.iterrows()
+    }
+    all_player_labels = list(player_label_to_id.keys())
+    default_players = [all_player_labels[0]] if len(all_player_labels) > 0 else []
     
     with col_p1:
         selected_players = st.multiselect(
             "Select Player(s) to Compare",
-            options=all_players,
+            options=all_player_labels,
             default=default_players
         )
     with col_p3:
@@ -254,11 +248,13 @@ with tab3:
         is_multi = len(selected_players) > 1
         comparison_rows = []
         
-        for idx, p_name in enumerate(selected_players):
-            p_df = df[(df['player_name'] == p_name) & (df['season'] == player_season)].sort_values(by='week')
+        for idx, p_label in enumerate(selected_players):
+            p_id = player_label_to_id[p_label]
+            p_df = df[(df['player_id'] == p_id) & (df['season'] == player_season)].sort_values(by='week')
             if len(p_df) == 0:
                 continue
                 
+            p_name = str(p_df['player_display_name'].iloc[-1])
             comparison_rows.append(p_df.iloc[-1])
             base_color = player_palette[idx % len(player_palette)]
             
@@ -342,7 +338,7 @@ with tab3:
                 comp_df['injury_status'] = 'Healthy'
                 
             summary_cols = [
-                'player_name', 'position', 'recent_team', 'week',
+                'player_display_name', 'position', 'recent_team', 'week',
                 'effective_next_opponent', 'next_opp_dvp_total_adj',
                 'valuation_signal', 'predicted_next_week_ppr', 'projected_next_week_xfp',
                 'recent_actual_3wk', 'recent_expected_3wk',
