@@ -13,14 +13,14 @@ import plotly.graph_objects as go
 
 BASE_DIR = os.path.dirname(__file__) if '__file__' in globals() else os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
+SIGNALS_PATH = os.path.join(DATA_DIR, "player_valuation_signals.csv")
 
 @st.cache_data
-def load_data():
-    signals_path = os.path.join(DATA_DIR, "player_valuation_signals.csv")
-    if not os.path.exists(signals_path):
+def load_data(file_mtime: float):
+    if not os.path.exists(SIGNALS_PATH):
         st.error("Valuation data file not found! Please run 04_generate_buy_sell_signals.py.")
         st.stop()
-    df = pd.read_csv(signals_path, low_memory=False)
+    df = pd.read_csv(SIGNALS_PATH, low_memory=False)
     if 'player_display_name' not in df.columns:
         df['player_display_name'] = df['player_name']
     else:
@@ -35,13 +35,23 @@ st.set_page_config(
 
 st.sidebar.title("🏈 Valuation Filters")
 
-df = load_data()
+signals_mtime = os.path.getmtime(SIGNALS_PATH) if os.path.exists(SIGNALS_PATH) else 0.0
+df = load_data(signals_mtime)
 
 seasons = sorted(df['season'].unique(), reverse=True)
 selected_season = st.sidebar.selectbox("Select Season", seasons)
 
-weeks = sorted(df[df['season'] == selected_season]['week'].unique(), reverse=True)
-selected_week = st.sidebar.selectbox("Select Week", weeks)
+season_df = df[df['season'] == selected_season]
+weeks = sorted(season_df['week'].unique(), reverse=True)
+
+# Default to the latest week with at least 8 teams played (avoids defaulting to a 2-team TNF partial slate on Friday/Saturday)
+default_week_idx = 0
+for idx, w in enumerate(weeks):
+    if season_df[season_df['week'] == w]['recent_team'].nunique() >= 8:
+        default_week_idx = idx
+        break
+
+selected_week = st.sidebar.selectbox("Select Week", weeks, index=default_week_idx)
 
 positions = ["ALL", "WR", "RB", "TE", "QB"]
 selected_pos = st.sidebar.selectbox("Position Filter", positions)
