@@ -38,16 +38,16 @@ streamlit run app.py
 
 ## 📂 Repository Structure
 
-* [`01_fetch_data.py`](01_fetch_data.py): Dynamic Polars ingestion via `nflreadpy` for historical + live NFL seasons (weekly stats, injury reports, and upcoming opponent schedule lookups).
-* [`02_feature_engineering.py`](02_feature_engineering.py): Computes position-specific Expected Fantasy Points ($xFP$), Empirical Bayesian Shrinkage, and Zero-Leakage Defense vs. Position (DvP) & Schedule-Adjusted rolling features.
-* [`03_train_qb_model.py`](03_train_qb_model.py): Quarterback walk-forward benchmark suite (Dual-threat rushing + passing air yards + DvP).
-* [`03_train_rb_model.py`](03_train_rb_model.py): Running Back walk-forward benchmark suite (VIF audit, Stepwise Bilateral AIC, Pure Opportunity + DvP).
-* [`03_train_wr_model.py`](03_train_wr_model.py): Wide Receiver walk-forward benchmark suite (Target share, air yards, Pure Opportunity + DvP).
-* [`03_train_te_model.py`](03_train_te_model.py): Tight End walk-forward benchmark suite (Stepwise BIC vs. AIC on Pure Opportunity infrastructure).
-* [`04_generate_buy_sell_signals.py`](04_generate_buy_sell_signals.py): Trains the 4 decoupled position champion models, preserves neutral-matchup per-game projections on bye weeks, and assigns dynamic positional quantile valuation signals.
-* [`optimize_bayesian_priors.py`](optimize_bayesian_priors.py): Empirical Bayes ANOVA variance decomposition ($\sigma_{\text{within}}^2 / \sigma_{\text{between}}^2$) to derive positional stabilization constants ($m_{\text{pos}}$).
-* [`app.py`](app.py): Interactive Streamlit web application featuring a 4-quadrant Plotly scatter plot, position-filtered trade target leaderboard, player trajectory charts, and a 1-click live NFL data refresh button.
-* [`DIRECTORY.md`](DIRECTORY.md): Living project directory and statistical reference log.
+* [`01_fetch_data.py`](https://github.com/aclink88/ffbEval/blob/main/01_fetch_data.py): Dynamic Polars ingestion via `nflreadpy` for historical + live NFL seasons (weekly stats, injury reports, and upcoming opponent schedule lookups).
+* [`02_feature_engineering.py`](https://github.com/aclink88/ffbEval/blob/main/02_feature_engineering.py): Computes position-specific Expected Fantasy Points ($xFP$), Empirical Bayesian Shrinkage, and Zero-Leakage Defense vs. Position (DvP) & Schedule-Adjusted rolling features.
+* [`03_train_qb_model.py`](https://github.com/aclink88/ffbEval/blob/main/03_train_qb_model.py): Quarterback walk-forward benchmark suite (Dual-threat rushing + passing air yards + DvP).
+* [`03_train_rb_model.py`](https://github.com/aclink88/ffbEval/blob/main/03_train_rb_model.py): Running Back walk-forward benchmark suite (VIF audit, Stepwise Bilateral AIC, Pure Opportunity + DvP).
+* [`03_train_wr_model.py`](https://github.com/aclink88/ffbEval/blob/main/03_train_wr_model.py): Wide Receiver walk-forward benchmark suite (Target share, air yards, Pure Opportunity + DvP).
+* [`03_train_te_model.py`](https://github.com/aclink88/ffbEval/blob/main/03_train_te_model.py): Tight End walk-forward benchmark suite (Stepwise BIC vs. AIC on Pure Opportunity infrastructure).
+* [`04_generate_buy_sell_signals.py`](https://github.com/aclink88/ffbEval/blob/main/04_generate_buy_sell_signals.py): Trains the 4 decoupled position champion models, preserves neutral-matchup per-game projections on bye weeks, and assigns dynamic positional quantile valuation signals.
+* [`optimize_bayesian_priors.py`](https://github.com/aclink88/ffbEval/blob/main/optimize_bayesian_priors.py): Empirical Bayes ANOVA variance decomposition ($\sigma_{\text{within}}^2 / \sigma_{\text{between}}^2$) to derive positional stabilization constants ($m_{\text{pos}}$).
+* [`app.py`](https://github.com/aclink88/ffbEval/blob/main/app.py): Interactive Streamlit web application featuring a 4-quadrant Plotly scatter plot, position-filtered trade target leaderboard, and multi-player trajectory comparisons.
+* [`DIRECTORY.md`](https://github.com/aclink88/ffbEval/blob/main/DIRECTORY.md): Living project directory and statistical reference log.
 
 ---
 
@@ -227,7 +227,7 @@ Uses **Opportunity Units** (Pass Dropbacks for QBs, Touches for RBs, Targets for
 
 ## 🛡️ 7. DEFENSE VS. POSITION (DvP) & SCHEDULE ADJUSTMENT ENGINE
 
-To avoid the three classic pitfalls of raw "Points Allowed per Game" (schedule bias, touchdown flukes, and lookahead data leakage), our pipeline implements a **Zero-Leakage Bayesian DvP & Schedule-Adjustment Engine** across [`01_fetch_data.py`](01_fetch_data.py) and [`02_feature_engineering.py`](02_feature_engineering.py).
+To avoid the three classic pitfalls of raw "Points Allowed per Game" (schedule bias, touchdown flukes, and lookahead data leakage), our pipeline implements a **Zero-Leakage Bayesian DvP & Schedule-Adjustment Engine** across [`01_fetch_data.py`](https://github.com/aclink88/ffbEval/blob/main/01_fetch_data.py) and [`02_feature_engineering.py`](https://github.com/aclink88/ffbEval/blob/main/02_feature_engineering.py).
 
 ### **A. Decomposing Defensive Allowances into Volume vs. Efficiency**
 For every `(season, week, opponent_team, position)` group, we aggregate total points allowed and decompose them into two orthogonal components:
